@@ -37,6 +37,8 @@ def load_mnist_data():
         outfile = script_dir + "/../data/fashion-mnist/" + outfile
         with gzip.open(outfile, "rb") as f:
             mnist[key] = np.frombuffer(f.read(), np.uint8, offset=8)
+    mnist['train_images'] = mnist['train_images'].astype(np.float32) / 255.0
+    mnist['test_images'] = mnist['test_images'].astype(np.float32) / 255.0
     return mnist
 
 def show_data(mnist_data):
@@ -66,13 +68,16 @@ print(f"loading mnist data time is {end - start}s")
 def net(X, w, b):
     X = X.reshape((-1, 784, 1)).squeeze()
     X = X @ w + b
-    X_exp = mx.exp(X)
-    return X_exp / mx.sum(X_exp, axis=1).reshape((-1, 1))
+    X_max = mx.max(X, axis=1, keepdims=True)
+    X_exp = mx.exp(X - X_max)
+    return X_exp / mx.sum(X_exp, axis=1, keepdims=True)
 
 
 def cross_entropy(y_hat, y):
     y_hat_correct = mx.take_along_axis(y_hat, y.reshape((-1, 1)), axis=1)
-    return mx.mean(-mx.log(y_hat_correct))
+    eps = 1e-8
+    safe_y_hat = mx.maximum(y_hat_correct, eps)
+    return mx.mean(-mx.log(safe_y_hat))
 
 def cross_entropy_loss(param, X, y):
     y_hat = net(X, param['w'], param['b'])
@@ -86,19 +91,31 @@ def cross_entropy_test():
 # cross_entropy_test()
 
 
-batch_size = 64
+batch_size = 128
 num_inputs = 784
 num_outputs = 10
-lr = 0.03
+lr = 0.01
+num_epochs = 250
 param = {}
 param['w'] = mx.random.normal((num_inputs, num_outputs), scale=0.01)
 param['b'] = mx.zeros(num_outputs)
 
 loss_and_grad_fn = mx.value_and_grad(cross_entropy_loss)
+for epoch in range(num_epochs):
+    epoch_loss = 0
+    num_batches = 0
+    for X, y in data_iter(batch_size, mnist_data['train_images'], mnist_data['train_labels']):
+        X, y = mx.array(X), mx.array(y)
+        loss, dloss_para  = loss_and_grad_fn(param, X, y)
+        param['w'] -= lr * dloss_para['w']
+        param['b'] -= lr * dloss_para['b']
+        epoch_loss += loss
+        num_batches += 1
+    print(f"Epoch {epoch+1}, loss = {epoch_loss / num_batches:.4f}")
 
 for X, y in data_iter(batch_size, mnist_data['test_images'], mnist_data['test_labels']):
     X, y = mx.array(X), mx.array(y)
-    loss, dloss_para  = loss_and_grad_fn(param, X, y)
-    param['w'] -= lr * dloss_para['w']
-    param['b'] -= lr * dloss_para['b']
-    print(f"loss = {loss}")
+    y_hat = net(X, param['w'], param['b'])
+    pred = mx.argmax(y_hat, axis=1)
+    acc = mx.mean(pred == y)
+    print(f'acc = {acc}')
