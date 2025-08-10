@@ -89,7 +89,10 @@ def cross_entropy_test():
     loss = cross_entropy(y_hat, y)
     return loss
 # cross_entropy_test()
-
+def eval_fn(X, y):
+    X, y = mx.array(X), mx.array(y)
+    out = net(X, param['w'], param['b'])
+    return mx.mean(mx.argmax(out, axis=1) == y)
 
 batch_size = 128
 num_inputs = 784
@@ -106,16 +109,10 @@ for epoch in range(num_epochs):
     num_batches = 0
     for X, y in data_iter(batch_size, mnist_data['train_images'], mnist_data['train_labels']):
         X, y = mx.array(X), mx.array(y)
-        loss, dloss_para  = loss_and_grad_fn(param, X, y)
+        loss, dloss_para  = loss_and_grad_fn(param, X, y) 
         param['w'] -= lr * dloss_para['w']
         param['b'] -= lr * dloss_para['b']
         epoch_loss += loss
         num_batches += 1
-    print(f"Epoch {epoch+1}, loss = {epoch_loss / num_batches:.4f}")
-
-for X, y in data_iter(batch_size, mnist_data['test_images'], mnist_data['test_labels']):
-    X, y = mx.array(X), mx.array(y)
-    y_hat = net(X, param['w'], param['b'])
-    pred = mx.argmax(y_hat, axis=1)
-    acc = mx.mean(pred == y)
-    print(f'acc = {acc}')
+    accuracy = eval_fn(mnist_data['test_images'], mnist_data['test_labels'])
+    print(f"Epoch {epoch}: loss = {epoch_loss / num_batches:.4f}, Test accuracy {accuracy.item():.3f}")
