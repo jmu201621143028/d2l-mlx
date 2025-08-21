@@ -13,7 +13,7 @@ def gen_data():
     true_w = np.zeros(max_degree)
     true_w[0:4] = np.array([5, 1.2, -3.4, 5.6])
 
-    features = np.random.normal(size=(n_train + n_test, 1))
+    features = np.random.normal(scale=1.5, size=(n_train + n_test, 1))
     np.random.shuffle(features)
     '''
         features = (x1; x2; ... xn)
@@ -25,7 +25,7 @@ def gen_data():
     for i in range(max_degree):
         poly_features[:, i] /= math.gamma(i + 1) # gamma(n) = (n - 1)!
     labels = np.dot(poly_features, true_w)
-    labels += np.random.normal(scale=1.0, size=labels.shape)
+    labels += np.random.normal(scale=2.0, size=labels.shape)
     return poly_features, labels
 
 X, Y = gen_data()
